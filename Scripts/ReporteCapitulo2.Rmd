@@ -1,0 +1,228 @@
+---
+title: "DAG Consistency_Chapter 2"
+author: "Karen Velásquez C"
+date: "2025-11-07"
+output: word_document
+---
+
+```{r libraries, echo=TRUE, message=FALSE, warning=FALSE}
+library(dagitty)
+library(tidyverse)
+library(kableExtra)
+library(knitr)
+library(DHARMa)
+library(AICcmodavg)
+library(ggplot2)
+library(glmmTMB)
+library(piecewiseSEM)
+```
+
+```{r Data, echo=FALSE, message=FALSE, warning=FALSE}
+Dat <- read.csv("~/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Data/dataSEM.csv") %>% 
+   select(Rodq1:IE250) %>% 
+  select(-NDVI, -Aspect, -Rodq2) %>% 
+  rename(EI250= IE250)
+
+```
+
+
+## DAG - Small mammal abundance and Ecological integrity
+
+```{r DAG, warning=FALSE, , message=FALSE}
+DAG_abu <- downloadGraph("dagitty.net/mhXq8GEfk")
+#plot(DAG_abu)
+```
+
+```{r Plot DAGAbu, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::include_graphics("C:/Users/kalo_/Documents/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Img/DAG_GenAbun_071125.png")
+
+```
+
+
+```{r Test Abundancia, echo=FALSE, message=FALSE, warning=FALSE}
+res_abu <- localTests(x=DAG_abu, data=Dat, type= "cis")
+kable(res_abu) 
+
+```
+
+Acá explicar para que se hace el ajuste del p-value
+
+```{r p.value Adjust Abu, echo=FALSE, message=FALSE, warning=FALSE}
+res_abu$p.value <- p.adjust(res_abu$p.value) 
+kable(res_abu) 
+
+```
+
+
+```{r Plot Test Abu, echo=FALSE, message=FALSE, warning=FALSE}
+
+res2plot_abu <- res_abu %>% 
+  rownames_to_column(var= "Pairs")
+
+ggplot(res2plot_abu, aes(x=estimate, y= Pairs))+
+  geom_pointrange(aes(xmin= `2.5%`, xmax= `97.5%`))+
+  geom_vline(xintercept = 0, linetype= "dashed", color= "purple")+
+  theme_minimal()
+```
+
+## DAG Small mammal diversity and Ecological integrity
+
+```{r DAG Diversidad, message=FALSE, warning=FALSE}
+
+DAG_Div <- downloadGraph("dagitty.net/maX7kEkAu")
+#plot(DAG_div)
+
+```
+
+```{r Img DAG Div, echo=FALSE, message=FALSE, warning=FALSE}
+
+knitr::include_graphics("C:/Users/kalo_/Documents/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Img/DAG_GenDiv_071125.png")
+
+```
+
+```{r Test Div, echo=FALSE, message=FALSE, warning=FALSE}
+res_Div <- localTests(x=DAG_Div, data=Dat, type= "cis")
+kable(res_Div) 
+
+```
+
+Acá explicar para que se hace el ajuste del p-value
+
+```{r p.value Adjust Div, echo=FALSE, message=FALSE, warning=FALSE}
+res_Div$p.value <- p.adjust(res_Div$p.value) 
+kable(res_Div) 
+
+```
+
+```{r Plot DAG Div, echo=FALSE, message=FALSE, warning=FALSE}
+
+res2plot_Div <- res_Div %>% 
+  rownames_to_column(var= "Pairs")
+
+ggplot(res2plot_Div, aes(x=estimate, y= Pairs))+
+  geom_pointrange(aes(xmin= `2.5%`, xmax= `97.5%`))+
+  geom_vline(xintercept = 0, linetype= "dashed", color= "purple")+
+  theme_minimal()
+```
+
+
+## Modelos abundancia y diversidad basados en el DAG
+
+## Data ----
+
+```{r Data Mod, echo=TRUE, message=FALSE, warning=FALSE}
+chap2 <- read.csv("~/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Data/dataSEM.csv", header = T) 
+```
+
+```{r Modelos Abundancia, message=FALSE, warning=FALSE, include=FALSE}
+
+summary(ModAbu1 <- (glmmTMB(RodAbu~IE250, data = chap2, family = nbinom2())))
+summary(ModAbu2 <- (glmmTMB(RodAbu~IE250+PredAbun, data = chap2, family = nbinom2())))
+summary(ModAbu3 <- (glmmTMB(RodAbu~IE250+EVI, data = chap2, family = nbinom2())))
+summary(ModAbu4 <- (glmmTMB(RodAbu~IE250+Slope, data = chap2, family = nbinom2())))
+summary(ModAbu5 <- (glmmTMB(RodAbu~IE250+ProxIE0.5, data = chap2, family = nbinom2())))
+summary(ModAbu6 <- (glmmTMB(RodAbu~IE250+ProxIE0.5+Slope+EVI, data = chap2, family = nbinom2())))
+
+```
+
+# Modelos candidatos
+
+```{r Modelos candidatos Abundancia, message=FALSE, warning=FALSE}
+
+cand_Abun <- list(ModAbu1,ModAbu2,ModAbu3,ModAbu4,ModAbu5,ModAbu6)
+names_Abun <- c("RodAbu~IE250",
+              "RodAbu~IE250+PredAbun",
+              "RodAbu~IE250+EVI",
+              "RodAbu~IE250+Slope",
+              "RodAbu~IE250+ProxIE0.5",
+              "RodAbu~IE250+ProxIE0.5+Slope+EVI"
+              )
+
+```
+
+
+```{r Selección de modelos, echo=FALSE, message=FALSE, warning=FALSE}
+
+AICc_Abun <- aictab(cand_Abun,
+                  modnames = names_Abun,
+                  second.ord = T,
+                  sort = T)
+AICc_Abun
+```
+
+
+## Test dispersión y Zero inflado
+
+# Modelo seis RodAbu~IE250+ProxIE0.5+Slope+EVI
+
+```{r}
+testDispersion(ModAbu6)
+ModAbu6_residuals <- simulateResiduals(ModAbu6)
+plot(ModAbu6_residuals)
+testZeroInflation(ModAbu6)
+```
+
+# Modelo cinco RodAbu~IE250+ProxIE0.5
+
+```{r}
+testDispersion(ModAbu5)
+ModAbu5_residuals <- simulateResiduals(ModAbu5)
+plot(ModAbu5_residuals)
+testZeroInflation(ModAbu5)
+```
+
+# Modelo uno RodAbu~IE250
+
+```{r}
+testDispersion(ModAbu1)
+ModAbu1_residuals <- simulateResiduals(ModAbu1)
+plot(ModAbu1_residuals)
+testZeroInflation(ModAbu1)
+```
+
+
+### Diversity models
+
+```{r Models diversity}
+summary(ModDiv1 <- (glmmTMB(Rodq1~IE250, data = chap2, family = gaussian())))
+summary(ModDiv2 <- (glmmTMB(Rodq1~IE250+Slope, data = chap2, family = gaussian())))
+summary(ModDiv3 <- (glmmTMB(Rodq1~IE250+EVI, data = chap2, family = gaussian())))
+summary(ModDiv4 <- (glmmTMB(Rodq1~IE250+Slope+EVI, data = chap2, family = gaussian())))
+```
+
+```{r Diversity candidate models}
+cand_Div <- list(ModDiv1,ModDiv2,ModDiv3,ModDiv4)
+names_Div <- c("Rodq1~IE250",
+                "Rodq1~IE250+Slope",
+                "Rodq1~IE250+EVI",
+                "Rodq1~IE250+Slope+EVI"
+)
+```
+
+```{r Diversity model selection}
+AICc_Div <- aictab(cand_Div,
+                    modnames = names_Div,
+                    second.ord = T,
+                    sort = T)
+
+```
+
+## Test dispersión y Zero inflado
+
+# Modelo uno Rodq1~IE250
+
+```{r test Div Mod1}
+testDispersion(ModDiv1)
+ModDiv1_residuals <- simulateResiduals(ModDiv1)
+plot(ModDiv1_residuals)
+testZeroInflation(ModDiv1)
+```
+
+```{r test Div Mod4}
+testDispersion(ModDiv4)
+ModDiv4_residuals <- simulateResiduals(ModDiv4)
+plot(ModDiv4_residuals)
+testZeroInflation(ModDiv4)
+```
+

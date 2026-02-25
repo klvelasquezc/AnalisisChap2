@@ -1,0 +1,167 @@
+---
+title: "GAMLSS"
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    number-depth: 4
+    toc-title: Contenido
+    number-sections: true
+    html-math-method: katex
+    css: styles.css
+    embed-resources: true
+bibliography: references.bib
+---
+
+# Ejemplo
+
+```{r Paqueterias}
+#| warning: false
+library(gamlss)
+library(tidyverse)
+library(ggpubr)
+library(skimr)
+library(mgcv)
+```
+
+```{r Datos}
+datos <- read.csv("~/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Data/dataSEM.csv")
+
+```
+
+```{r}
+p1 <- ggplot(data = datos, aes(x = IE250, y = PredAbun, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Abundancia Predadores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+p2 <- ggplot(data = datos, aes(x = IE250, y = RodAbu, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Abundancia Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+p3 <- ggplot(data = datos, aes(x = IE250, y = Rodq0, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Riqueza q0 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+p4 <- ggplot(data = datos, aes(x = IE250, y = Rodq1, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Riqueza q1 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+p5 <- ggplot(data = datos, aes(x = IE250, y = Rodq2, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Riqueza q1 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+p6 <- ggplot(data = datos, aes(x = IE250, y = AbuPero, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "IE vs Abundancia Peromyscus") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+ggpubr::ggarrange(
+  plotlist = list(p1, p2, p3, p4, p5, p6),
+  legend = "bottom",
+  common.legend = TRUE
+) %>%
+ggpubr::annotate_figure(
+  top = text_grob("Relación entre la IE y las variables",
+                  color = "Black",
+                  face  = "bold",
+                  size  = 14,
+                  x     = 0.3)
+  )
+```
+
+```{r}
+g1 <- ggplot(data = datos, aes(x = ProxIE0.5, y = PredAbun, colour = as.factor(Cumulo))) + 
+      geom_point(size = 3, alpha = 0.4) +
+      labs(title = "Prox IE 0.5 vs Abundancia Predadores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+g2 <- ggplot(data = datos, aes(x = ProxIE0.5, y = RodAbu, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "Prox IE 0.5 vs Abundancia Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+g3 <- ggplot(data = datos, aes(x = ProxIE0.5, y = Rodq0, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "Prox IE 0.5 vs Riqueza q0 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+g4 <- ggplot(data = datos, aes(x = ProxIE0.5, y = Rodq1, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "Prox IE 0.5 vs Riqueza q1 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+g5 <- ggplot(data = datos, aes(x = ProxIE0.5, y = Rodq2, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(title = "Prox IE 0.5 vs Riqueza q1 Roedores") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+g6 <- ggplot(data = datos, aes(x = ProxIE0.5, y = AbuPero, colour = as.factor(Cumulo))) + 
+      geom_point(size= 3, alpha = 0.4) +
+      labs(ttile = "Prox IE 0.5 vs Abundancia Peromyscus") +
+      theme_bw()+
+      scale_color_manual(values=c("#8A1FDB", "#22BDA5"))
+
+ggpubr::ggarrange(
+  plotlist = list(g1, g2, g3, g4, g5, g6),
+  legend = "bottom",
+  common.legend = TRUE
+) %>%
+ggpubr::annotate_figure(
+  top = text_grob("Relación entre Prox IE y las variables",
+                  color = "Black",
+                  face  = "bold",
+                  size  = 14,
+                  x     = 0.3)
+  )
+```
+
+## Modelos
+
+### Abuncia PMNV
+
+```{r}
+modelo_gam <- gamlss(
+                formula = RodAbu ~ pb(IE250),
+                family  = NBF(),
+                data    = datos,
+                trace   = FALSE
+             )
+
+summary(modelo_gam)
+
+```
+
+```{r}
+term.plot(modelo_gam, pages = 1, ask = FALSE, rug = TRUE)
+```
+
+```{r}
+plot(modelo_gam, ylim.all = 10)
+```
+
+```{r}
+wp(modelo_gam, ylim.all = 20)
+```
+
+## Paquetería mgcv
+
+```{r}
+mod_gam2 = gam(RodAbu ~ s(IE250), data = datos, knots = 15)
+summary(mod_gam2)
+```

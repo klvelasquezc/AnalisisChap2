@@ -1,0 +1,757 @@
+---
+title: "Material suplementario"
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    number-depth: 4
+    toc-title: Contenido
+    number-sections: true
+    html-math-method: katex
+    css: styles.css
+    embed-resources: true
+bibliography: references.bib
+---
+
+## Paqueterías
+
+```{r libraries, message=FALSE, warning=FALSE}
+#| echo: true
+library(dagitty)
+library(tidyverse)
+library(DHARMa)
+library(glmmTMB)
+library(performance)
+library(parameters)
+library(gt)
+library(AICcmodavg)
+library(ggdag)
+library(here)
+```
+
+## DAGs - Directed Acyclic Graphic
+
+Se planteó un gráfico acíclico dirigido (DAG - Directed Acyclic Graph) para describir la relación entre el índice de integridad ecosistémica (IE) (Equihua et al., 2014) y la diversidad y abundancia de pequeños mamíferos. Las relaciones se propusieron bajo la metodología de modelo Gráfico Causal (GCM - Graphical Causal Model) (Pearl, 2009; Schoolmaster Jr. et al., 2020). El GCM permite representar el conocimiento acerca del funcionamiento de un proceso como un diagrama causal e identificar qué observaciones mínimas son requeridas para estimar sin sesgos el efecto de una variable X en Y dada una estructura causal hipotética (Schoolmaster Jr. et al., 2020).
+
+```{r Data, message=FALSE, warning=FALSE}
+#| include: false
+Dat <- read.csv("~/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Data/dataSEM.csv") %>% 
+   select(Rodq1:IE250) %>% 
+  select(-NDVI, -Aspect, -Rodq2, -AbuPero, -AbuLio) %>% 
+  rename(EI250= IE250) %>% 
+  drop_na()
+
+```
+
+### DAG - Abundancia pequeños mamíferos e integridad ecológica (IE)
+
+```{r DAG, warning=FALSE, , message=FALSE}
+#| echo: false
+DAG_abu <- downloadGraph("dagitty.net/mhXq8GEfk")
+
+```
+
+![](images/DAG_GenAbun_071125-01.png)
+
+### DAG - Diversidad pequeños mamíferos e integridad ecológica (IE)
+
+```{r DAG Diversidad, message=FALSE, warning=FALSE}
+#| echo: false
+
+DAG_Div <- downloadGraph("dagitty.net/maX7kEkAu")
+
+```
+
+![](images/DAG_GenDiv_071125-01.png)
+
+## Coherencia del conjunto de datos DAG
+
+Se realizó una prueba de consistencia del DAG, el cual contrasta los datos observacionales con las relaciones propuestas en el DAG. La prueba busca corroborar que las independencias condicionales entre las variables sean mantenidas en los datos. La prueba genera una correlación de Pearson para cada una de las independencias condicionales implicadas en el DAG. Un coeficiente de correlación cercano a cero con un p-value \> 0.05 se obtiene si la independencia condicional se mantiene en los datos observacionales. En contraste, un alto valor de correlación y un p-value \<0.05 indican que las independencias condicionales no se mantienen en los datos (Ankan et al., 2021).
+
+### Test consistencia del conjunto de datos DAG: abundancia
+
+```{r Test Abundancia}
+#| include: false
+# echo: false
+res_abu <- localTests(x=DAG_abu, data=Dat, type= "cis")
+#kable(res_abu) 
+res_abu
+```
+
+```{r}
+#| eval: false
+#| include: false
+#write.csv(res_abu, "testDAGAbu.csv")
+```
+
+#### Ajuste p-valor - Holm-Bonferroni correction
+
+```{r p.value Adjust Abu, message=FALSE, warning=FALSE}
+#| echo: false
+resAbu.Ad <- res_abu %>% mutate(Pvalue.Ad = (p.adjust(res_abu$p.value)))
+resAbu.Ad
+
+```
+
+```{r Plot Test Abu, message=FALSE, warning=FALSE}
+#| echo: false
+
+res2plot_abu <- res_abu %>% 
+  rownames_to_column(var= "Pairs")
+
+abuTest <- ggplot(res2plot_abu, aes(x=estimate, y= Pairs))+
+  geom_pointrange(aes(xmin= `2.5%`, xmax= `97.5%`))+
+  geom_vline(xintercept = 0, linetype= "dashed", color= "purple")+
+  theme_minimal()
+ggsave("ResAbuPlot.png")
+
+abuTest
+```
+
+### Test consistencia del conjunto de datos DAG: diversidad
+
+```{r Test Div, message=FALSE, warning=FALSE}
+#| include: false
+res_Div <- localTests(x=DAG_Div, data=Dat, type= "cis")
+res_Div
+plotLocalTestResults(res_Div)
+```
+
+```{r}
+#| eval: false
+#| include: false
+#write.csv(res_Div, "testDAGDiv.csv")
+```
+
+#### Ajuste p-valor - Holm-Bonferroni correction
+
+```{r p.value Adjust Div, message=FALSE, warning=FALSE}
+#| echo: false
+res_DivAd <- res_Div %>% mutate(Pvalue.Ad = (p.adjust(res_Div$p.value)))
+res_DivAd
+
+```
+
+```{r Plot DAG Div, message=FALSE, warning=FALSE}
+#| echo: false
+
+res2plot_Div <- res_Div %>% 
+  rownames_to_column(var= "Pairs")
+
+DivTest <- ggplot(res2plot_Div, aes(x=estimate, y= Pairs))+
+  geom_pointrange(aes(xmin= `2.5%`, xmax= `97.5%`))+
+  geom_vline(xintercept = 0, linetype= "dashed", color= "purple")+
+  theme_minimal()
+DivTest
+ggsave("ResDivPlot.png")
+
+```
+
+Tomando como base las relaciones propuestas en el DAG, y el test de consistencia del mismo, se evaluó el modelo que incluía la variable IE250 como único predictor de la abundancia y riqueza de PMNV. Lo anterior, siguiendo la aproximación causal evaluando el modelo con el mínimo número de variables que explicarían el efecto de la IE sobre la abundancia y diversidad de PMNV basado en el DAG [@arif2023].
+
+Adicionalmente, como ejercicio exploratorio, se ajustaron los modelos que podrían generarse con base a las variables del DAG siguiendo la aproximación Hipotetico Deductiva (HD) [@nichols2025]. A partir del criterio de información de Akaike (AICc), se seleccionaron los modelos con un delta menor a dos para su posterior evaluación.
+
+## Modelos abundancia generales
+
+### Datos
+
+```{r Data Mod, echo=TRUE, message=FALSE, warning=FALSE}
+chap2 <- read.csv("~/INECOL/Doctorado/Proyecto2020/Capitulo 2/Analisis SEM/Data/dataSEM.csv", header = T) %>% 
+  drop_na()
+
+```
+
+### Modelos
+
+```{r Prueba distribuciones}
+#| warning: false
+#| include: false
+
+# Familia Poisson
+
+AbuPos<- (glmmTMB(RodAbu~IE250, data = chap2, family = poisson))
+testDispersion(AbuPos)
+testZeroInflation(AbuPos)
+
+
+# Familia Negativo Binomial
+
+AbuNB<- (glmmTMB(RodAbu~IE250, data = chap2, family = nbinom2()))
+testDispersion(AbuNB)
+testZeroInflation(AbuNB)
+
+# Familia Poisson con Zero inflado
+
+AbuPosZI<- (glmmTMB(RodAbu~IE250, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = poisson))
+
+testDispersion(AbuPosZI)
+testZeroInflation(AbuPosZI)
+
+# Familia Negativo Binomial con Zero inflado
+
+AbuNBZI<- (glmmTMB(RodAbu~IE250, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = nbinom2()))
+
+testDispersion(AbuNBZI)
+testZeroInflation(AbuNBZI)
+
+
+```
+
+```{r Modelos Abundancia, message=FALSE, warning=FALSE}
+#| echo: true
+
+# Modelos siguiendo el DAG
+
+ModAbu1 <- (glmmTMB(RodAbu~IE250, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu2 <- (glmmTMB(RodAbu~IE250+PredAbun, data = chap2, family = nbinom2(),
+                    ziformula = ~1))
+ModAbu3 <- (glmmTMB(RodAbu~IE250+Slope, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu4 <- (glmmTMB(RodAbu~IE250+ProxIE0.5, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu5 <- (glmmTMB(RodAbu~IE250+EVI, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu6 <- (glmmTMB(RodAbu~PredAbun, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu7 <- (glmmTMB(RodAbu~EVI, data = chap2, family = nbinom2(), ziformula = ~1))
+ModAbu8 <- (glmmTMB(RodAbu~ProxIE0.5, data = chap2, family = nbinom2(), ziformula = ~1, dispformula =~as.factor(Season)))
+ModAbu9 <- (glmmTMB(RodAbu~as.factor(Cumulo), data = chap2, family = nbinom2(), ziformula = ~1))
+
+```
+
+```{r Modelos candidatos Abundancia, message=FALSE, warning=FALSE}
+#| echo: true
+
+cand_Abun <- list(ModAbu1,ModAbu2,ModAbu3,ModAbu4,ModAbu5,ModAbu6,ModAbu7,ModAbu8, ModAbu9)
+names_Abun <- c("RodAbu~IE250",
+                "RodAbu~IE250+PredAbun",
+                "RodAbu~IE250+Slope",
+                "RodAbu~IE250+ProxIE0.5",
+                "RodAbu~IE250+EVI",
+                "RodAbu~PredAbun",
+                "RodAbu~EVI",
+                "RodAbu~ProxIE0.5",
+                 "RodAbu~Cumulo"
+                )
+
+AICc_Abun <- aictab(cand_Abun,
+                  modnames = names_Abun,
+                  second.ord = T,
+                  sort = T)
+AICc_Abun
+
+```
+
+### Modelo RodAbu\~EI250
+
+### Test de dispersión y cero inflado
+
+```{r}
+#| echo: false
+gt(parameters(ModAbu1))
+```
+
+#### Test dispersión Modelo 1 RodAbu\~EI250
+
+```{r}
+#| echo: false
+testDispersion(ModAbu1)
+ModAbu1_residuals <- simulateResiduals(ModAbu1)
+plot(ModAbu1_residuals)
+testZeroInflation(ModAbu1)
+
+```
+
+### Modelo RodAbu\~ProxIE0.5
+
+```{r RodAbu~Proxi IE0.5}
+#| echo: false
+gt(parameters(ModAbu8))
+```
+
+#### Test dispersión Modelo 8 RodAbu\~Proxi EI0.5
+
+```{r}
+#| echo: false
+testDispersion(ModAbu8)
+ModAbu8_residuals <- simulateResiduals(ModAbu8)
+plot(ModAbu8_residuals)
+testZeroInflation(ModAbu8)
+```
+
+## Modelo de abundancia Peromyscus
+
+### Modelos abundancia Peromyscus
+
+```{r Prueba distri Peromyscus}
+#| eval: false
+#| include: false
+
+# Familia Poisson
+
+PeroPos<- (glmmTMB(AbuPero~IE250+PredAbun, data = chap2, family = poisson))
+testDispersion(PeroPos)
+testZeroInflation(PeroPos)
+check_zeroinflation(PeroPos)
+
+# Familia Negativo Binomial
+
+PeroNB<- (glmmTMB(AbuPero~IE250+PredAbun, data = chap2, family = nbinom2()))
+testDispersion(PeroNB)
+testZeroInflation(PeroNB)
+check_zeroinflation(PeroNB)
+
+# Familia Poisson con Zero inflado
+
+PeroPosZI<- (glmmTMB(AbuPero~IE250+PredAbun, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = poisson))
+
+testDispersion(PeroPosZI)
+testZeroInflation(PeroPosZI)
+
+# Familia Negativo Binomial con Zero inflado
+
+PeroNBZI<- (glmmTMB(AbuPero~IE250+PredAbun, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = nbinom2()))
+
+testDispersion(PeroNBZI)
+testZeroInflation(PeroNBZI)
+
+
+```
+
+```{r}
+#| echo: true
+ModPero1 <- (glmmTMB(AbuPero~IE250, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero2 <- (glmmTMB(AbuPero~IE250+PredAbun, data = chap2, family = nbinom2(),
+                    ziformula = ~1))
+ModPero3 <- (glmmTMB(AbuPero~IE250+Slope, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero4 <- (glmmTMB(AbuPero~IE250+ProxIE0.5, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero5 <- (glmmTMB(AbuPero~IE250+EVI, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero6 <- (glmmTMB(AbuPero~PredAbun, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero7 <- (glmmTMB(AbuPero~EVI, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero8 <- (glmmTMB(AbuPero~ProxIE0.5, data = chap2, family = nbinom2(), ziformula = ~1))
+ModPero9 <- (glmmTMB(AbuPero~as.factor(Cumulo), data = chap2, family = nbinom2(), ziformula = ~1))
+```
+
+```{r candidatos abundancia Pero}
+#| echo: true
+cand_Abun_Pero  <- list(ModPero1,ModPero2,ModPero3,ModPero4,ModPero5,ModPero6,ModPero7,ModPero8,ModPero9)
+names_Abun_Pero <- c("AbuPero~IE250",
+                     "AbuPero~IE250+PredAbun",
+                     "AbuPero~IE250+Slope",
+                     "AbuPero~IE250+ProxIE0.5",
+                     "AbuPero~IE250+EVI",
+                     "AbuPero~PredAbun",
+                     "AbuPero~EVI",
+                     "AbuPero~ProxIE0.5",
+                     "AbuPero~as.factor(Cumulo)"
+                     )
+
+AICc_Abun_Pero <- aictab(cand_Abun_Pero,
+                  modnames = names_Abun_Pero,
+                  second.ord = T,
+                  sort = T)
+AICc_Abun_Pero
+```
+
+### Modelo AbuPero\~IE250
+
+```{r Modelo AbuPero~IE250}
+#| echo: false
+gt(parameters(ModPero1))
+```
+
+#### Test dispersión y Zero inflado Modelos 1 AbuPero\~IE250
+
+```{r Tests AbuPero~IE250}
+#| echo: false
+testDispersion(ModPero1)
+ModPero1_residuals <- simulateResiduals(ModPero1)
+plot(ModPero1_residuals)
+testZeroInflation(ModPero1)
+
+```
+
+### Modelo AbuPero\~ProxIE0.5
+
+```{r Mod AbuPero~ProxIE0.5}
+#| eval: false
+#| include: false
+gt(parameters(ModPero8))
+```
+
+#### Test dispersión y Zero inflado Modelo 8 AbuPero\~ProxIE0.5
+
+```{r Tests AbuPero~ProxIE0.5}
+testDispersion(ModPero8)
+ModPero8_residuals <- simulateResiduals(ModPero8)
+plot(ModPero8_residuals)
+testZeroInflation(ModPero8)
+```
+
+### Modelo AbuPero\~Cumulo
+
+```{r Mod AbuPero~Cumulo}
+#| eval: false
+#| include: false
+gt(parameters(ModPero9))
+```
+
+#### Test dispersión y Zero inflado Modelo 9 AbuPero\~Cumulo
+
+```{r Tests AbuPero~Cumulo}
+testDispersion(ModPero9)
+ModPero9_residuals <- simulateResiduals(ModPero9)
+plot(ModPero9_residuals)
+testZeroInflation(ModPero9)
+```
+
+### Modelo AbuPero\~PredAbun
+
+```{r Mod AbuPero~PredAbun}
+#| eval: false
+#| include: false
+gt(parameters(ModPero6))
+
+```
+
+```{r Tests AbuPero~PredAbun}
+testDispersion(ModPero6)
+ModPero6_residuals <- simulateResiduals(ModPero6)
+plot(ModPero6_residuals)
+testZeroInflation(ModPero6)
+
+```
+
+## Modelos de diversidad
+
+### Riqueza q0
+
+```{r distribuciones q0}
+#| eval: false
+#| warning: false
+#| include: false
+
+# Familia Poisson
+
+q0Pois<- (glmmTMB(Rodq0~IE250, data = chap2, family = poisson()))
+testDispersion(q0Pois)
+testZeroInflation(q0Pois)
+check_zeroinflation(q0Pois)
+
+# Familia Poisson con Zero inflado
+
+q0PoisZI<- (glmmTMB(Rodq0~IE250, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = poisson))
+
+testDispersion(q0PoisZI)
+testZeroInflation(q0PoisZI)
+
+# # Familia Com Poisson
+
+q0CPois<- (glmmTMB(Rodq0~IE250, data = chap2, family = compois()))
+testDispersion(q0CPois)
+testZeroInflation(q0CPois)
+
+
+# Familia Compois con Zero inflado
+
+q0CPoisZI<- (glmmTMB(Rodq0~IE250, 
+                    data = chap2, 
+                    ziformula = ~1,
+                    family = compois()))
+
+testDispersion(q0CPoisZI)
+testZeroInflation(q0CPoisZI)
+```
+
+```{r q0}
+#| echo: true
+#| message: false
+#| warning: false
+Mod1_q0 <- (glmmTMB(Rodq0~IE250, data = chap2, ziformula = ~1, family = poisson))
+Mod2_q0 <- (glmmTMB(Rodq0~IE250+Slope, data = chap2, ziformula = ~1, family = poisson()))
+Mod3_q0 <- (glmmTMB(Rodq0~IE250+EVI, data = chap2, ziformula = ~1, family = poisson()))
+Mod4_q0 <- (glmmTMB(Rodq0~IE250+Slope+EVI, data = chap2, ziformula = ~1, family = poisson()))
+Mod5_q0 <- (glmmTMB(Rodq0~ProxIE0.5, data = chap2, ziformula = ~1, family = poisson()))
+Mod6_q0 <- (glmmTMB(Rodq0~as.factor(Cumulo), data = chap2, ziformula = ~1, family = poisson()))
+
+
+
+```
+
+```{r q0 candidate models}
+#| echo: true
+cand_Divq0 <- list(Mod1_q0,Mod2_q0,Mod3_q0,Mod4_q0,Mod5_q0,Mod6_q0)
+names_Divq0 <- c("Rodq0~IE250",
+                 "Rodq0~IE250+Slope",
+                 "Rodq0~IE250+EVI",
+                 "Rodq0~IE250+Slope+EVI",
+                 "Rodq0~ProxIE0.5",
+                 "Rodq0~as.factor(Cumulo)"
+)
+
+AICc_Divq0 <- aictab(cand_Divq0,
+                  modnames = names_Divq0,
+                  second.ord = T,
+                  sort = T)
+AICc_Divq0
+
+```
+
+### Modelo Rodq0\~IE250
+
+```{r summary Mod1 q0}
+gt(parameters(Mod1_q0))
+```
+
+#### Test dispersión Modelo Rodq0\~IE250
+
+```{r}
+#| echo: false
+testDispersion(Mod1_q0)
+Mod1_q0_residuals <- simulateResiduals(Mod1_q0)
+plot(Mod1_q0_residuals)
+testZeroInflation(Mod3_q0)
+
+```
+
+### Modelo Rodq0\~ProxIE0.5
+
+```{r summary Mod1 q0~ProxIE0.5}
+gt(parameters(Mod5_q0))
+```
+
+#### Test dispersión Modelo Rodq0\~ProxIE0.5
+
+```{r}
+#| echo: false
+testDispersion(Mod5_q0)
+Mod5_q0_residuals <- simulateResiduals(Mod5_q0)
+plot(Mod5_q0_residuals)
+testZeroInflation(Mod5_q0)
+
+```
+
+### q1 Diversidad de especies
+
+#### Modelos
+
+```{r distribucion gaussiana}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribución normal
+Mod1_q1.2 <- (glmmTMB(Rodq1~IE250, data = chap2, family = gaussian()))
+check_model(Mod1_q1.2)
+check_normality(Mod1_q1.2)
+check_heteroscedasticity(Mod1_q1.2)
+
+```
+
+```{r distribución t}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribucion t
+Mod2_q1.2 <- (glmmTMB(Rodq1~IE250, data = chap2, family = t_family()))
+check_model(Mod2_q1.2)
+check_normality(Mod2_q1.2)
+check_heteroscedasticity(Mod2_q1.2)
+check_residuals(Mod2_q1.2)
+```
+
+```{r distribucion lognormalq1}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribución log normal
+Mod3_q1.2 <- (glmmTMB(Rodq1~IE250, data = chap2, ziformula= ~1,family = lognormal()))
+check_model(Mod3_q1.2)
+check_normality(Mod3_q1.2)
+check_heteroscedasticity(Mod3_q1.2)
+check_residuals(Mod3_q1.2)
+```
+
+```{r q1}
+#| echo: true
+#| message: false
+#| warning: false
+Mod1_q1 <- (glmmTMB(Rodq1~IE250, data = chap2, ziformula= ~1,family = gaussian()))
+Mod2_q1 <- (glmmTMB(Rodq1~ProxIE0.5, data = chap2, ziformula= ~1,family = gaussian()))
+Mod3_q1 <- (glmmTMB(Rodq1~IE250+Slope, data = chap2, ziformula= ~1,family = gaussian()))
+Mod4_q1 <- (glmmTMB(Rodq1~IE250+EVI, data = chap2, ziformula= ~1,family = gaussian()))
+Mod5_q1 <- (glmmTMB(Rodq1~IE250+Slope+EVI, data = chap2, ziformula= ~1,family = gaussian()))
+Mod6_q1 <- (glmmTMB(Rodq1~as.factor(Cumulo), data = chap2, ziformula= ~1,family = gaussian()))
+
+```
+
+```{r q1 model candidate}
+#| echo: true
+cand_Divq1 <- list(Mod1_q1,Mod2_q1,Mod3_q1,Mod4_q1,Mod5_q1,Mod6_q1)
+names_Divq1 <- c("Rodq1~IE250",
+                 "Rodq1~ProxIE0.5",
+                 "Rodq1~IE250+Slope",
+                 "Rodq1~IE250+EVI",
+                 "Rodq1~IE250+Slope+EVI",
+                 "Rodq1~as.factor(Cumulo)"
+)
+
+AICc_Divq1 <- aictab(cand_Divq1,
+                  modnames = names_Divq1,
+                  second.ord = T,
+                  sort = T)
+AICc_Divq1
+```
+
+### Modelo Rodq1\~IE250
+
+```{r summary Mod1_q1}
+#| echo: false
+#| warning: false
+gt(parameters(Mod1_q1))
+```
+
+#### Test dispersión - Modelo Rodq1\~IE250
+
+```{r Tests Mod1_q1}
+#| echo: false
+#| warning: false
+testDispersion(Mod1_q1)
+Mod1_q1_residuals <- simulateResiduals(Mod1_q1)
+plot(Mod1_q1_residuals)
+```
+
+### Modelo Rodq1\~ProxIE0.5
+
+```{r summary Mod2_q1}
+#| echo: false
+#| warning: false
+gt(parameters(Mod2_q1))
+
+```
+
+#### Test dispersión - Modelo Rodq1\~ProxIE0.5
+
+```{r Tests Mod2_q1}
+#| echo: false
+#| warning: false
+testDispersion(Mod2_q1)
+Mod2_q1_residuals <- simulateResiduals(Mod2_q1)
+plot(Mod2_q1_residuals)
+```
+
+### q2 Diversidad de especies
+
+#### Modelos
+
+```{r Distribución normal}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribución normal
+Mod1_q2.2 <- (glmmTMB(Rodq2~IE250+Slope+EVI+ProxIE0.5, data = chap2, family = gaussian()))
+check_model(Mod1_q2.2)
+check_normality(Mod1_q2.2)
+check_heteroscedasticity(Mod1_q2.2)
+
+```
+
+```{r distribucion t}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribución t
+Mod2_q2.2 <- (glmmTMB(Rodq2~IE250+Slope+EVI+ProxIE0.5, data = chap2, family = t_family()))
+check_model(Mod2_q2.2)
+check_normality(Mod2_q2.2)
+check_heteroscedasticity(Mod2_q2.2)
+```
+
+```{r distribucion lognormal}
+#| eval: false
+#| warning: false
+#| include: false
+# Prueba distribución lognormal
+Mod3_q2.2 <- (glmmTMB(Rodq2~IE250+Slope+EVI+ProxIE0.5, data = chap2, ziformula= ~1,family = lognormal()))
+check_model(Mod3_q2.2)
+check_normality(Mod3_q2.2)
+check_heteroscedasticity(Mod3_q2.2)
+
+```
+
+```{r q2 models}
+#| message: false
+#| warning: false
+#| include: false
+
+Mod1_q2 <- (glmmTMB(Rodq2~IE250, data = chap2, family=gaussian()))
+Mod2_q2 <- (glmmTMB(Rodq2~ProxIE0.5, data = chap2, family=gaussian()))
+Mod3_q2 <- (glmmTMB(Rodq2~IE250+Slope, data = chap2, ziformula=~1, family=gaussian()))
+Mod4_q2 <- (glmmTMB(Rodq2~IE250+EVI, data = chap2, ziformula=~1, family=gaussian))
+Mod5_q2 <- (glmmTMB(Rodq2~IE250+Slope+EVI, data = chap2, ziformula=~1, family=gaussian()))
+Mod6_q2 <- (glmmTMB(Rodq2~as.factor(Cumulo), data = chap2, ziformula=~1, family=gaussian()))
+
+```
+
+```{r q2 model candidate}
+#| eval: false
+#| include: false
+cand_Divq2 <- list(Mod1_q2,Mod2_q2,Mod3_q2,Mod4_q2,Mod5_q2,Mod6_q2)
+names_Divq2 <- c("Rodq2~IE250",
+                 "Rodq2~ProxIE0.5",
+                 "Rodq2~IE250+Slope",
+                 "Rodq2~IE250+EVI",
+                 "Rodq2~IE250+Slope+EVI",
+                 "Rodq2~as.factor(Cumulo)"
+)
+
+AICc_Divq2 <- aictab(cand_Divq2,
+                  modnames = names_Divq2,
+                  second.ord = T,
+                  sort = T)
+AICc_Divq2
+```
+
+### Modelo Rodq2\~IE250
+
+```{r summary Mod1 q2}
+#| warning: false
+gt(parameters(Mod1_q2))
+```
+
+#### Test dispersión Modelo Rodq2\~IE250
+
+```{r test Mod1 q2}
+#| echo: false
+#| warning: false
+testDispersion(Mod1_q2)
+Mod1_q2_residuals <- simulateResiduals(Mod1_q2)
+plot(Mod1_q2_residuals)
+
+```
+
+### Modelo Rodq2\~ProxIE0.5
+
+```{r summary Mod2 q2}
+#| warning: false
+gt(parameters(Mod2_q2))
+```
+
+```{r test Mod2 q2}
+#| echo: false
+#| warning: false
+testDispersion(Mod2_q2)
+Mod2_q2_residuals <- simulateResiduals(Mod2_q2)
+plot(Mod2_q2_residuals)
+
+```

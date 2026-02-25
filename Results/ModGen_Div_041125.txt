@@ -1,0 +1,23 @@
+dag {
+bb="0,0,1,1"
+"Inter and intraspecific competition" [latent,pos="0.740,0.417"]
+EI250 [exposure,pos="0.194,0.390"]
+EVI [pos="0.495,0.668"]
+Ectoparasite [latent,pos="0.705,0.196"]
+Precipitation [latent,pos="0.720,0.624"]
+PredAbun [pos="0.385,0.216"]
+ProxIE0.5 [pos="0.570,0.080"]
+Rodq1 [outcome,pos="0.534,0.381"]
+Slope [pos="0.277,0.599"]
+"Inter and intraspecific competition" -> Rodq1
+EI250 -> PredAbun
+EI250 -> Rodq1
+EVI -> PredAbun
+EVI -> Rodq1
+Ectoparasite -> Rodq1
+Precipitation -> EVI
+ProxIE0.5 -> PredAbun
+ProxIE0.5 -> Rodq1
+Slope -> PredAbun
+Slope -> Rodq1
+}
